@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ashford Contable</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-box">
+          <p class="eyebrow">Sistema contable</p>
+          <h2>Ashford</h2>
+        </div>
+
+        <nav class="sidebar-menu" aria-label="Menú principal">
+          <button class="sidebar-btn active" data-view="home">Inicio</button>
+          <button class="sidebar-btn" data-view="process">Proceso de compra</button>
+          <button class="sidebar-btn" data-view="clients">Clientes</button>
+        </nav>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Sistema contable uruguayo</p>
+            <h1>Gestión contable del emprendimiento</h1>
+          </div>
+          <div class="topbar-badge">PyME · Gestión integral</div>
+        </header>
+
+        <section id="home-screen" class="view active">
+          <div class="welcome-card card">
+            <h2>Bienvenido al sistema</h2>
+            <p>Seleccioná <strong>Proceso de compra</strong> en el menú lateral para acceder a la gestión completa de proveedores, pagos, mayores, saldos y asientos contables.</p>
+          </div>
+
+          <div class="home-cards-grid">
+            <article class="home-card action-card card">
+              <div class="card-label-row">
+                <span>Comprobante a proveedor</span>
+              </div>
+              <h3>Registrar comprobante</h3>
+              <p>Facturas, notas de crédito, ajustes de débito y pagos pendientes.</p>
+              <button class="secondary-btn" data-view="process">Ir a registrar</button>
+            </article>
+
+            <article class="home-card summary-card card">
+              <div class="card-label-row">
+                <span>Mayores</span>
+              </div>
+              <h3>Resumen contable</h3>
+              <ul class="mini-list">
+                <li>Compras: <strong id="home-compras">$ 0</strong></li>
+                <li>Pagos: <strong id="home-pagos">$ 0</strong></li>
+                <li>Saldo proveedores: <strong id="home-saldo">$ 0</strong></li>
+              </ul>
+            </article>
+
+            <article class="home-card recent-card card">
+              <div class="card-label-row">
+                <span>Últimos registros</span>
+              </div>
+              <h3>Actividad reciente</h3>
+              <ul id="recent-activity-list" class="activity-list"></ul>
+            </article>
+
+            <article class="home-card calendar-card card">
+              <div class="card-label-row">
+                <span>Próximos pagos</span>
+              </div>
+              <h3>Calendario de vencimientos</h3>
+              <div class="mini-calendar" id="mini-calendar"></div>
+              <ul id="payment-due-list" class="due-list"></ul>
+            </article>
+          </div>
+        </section>
+
+        <section id="process-screen" class="view">
+          <nav class="nav-tabs" aria-label="Paneles principales">
+            <button class="nav-btn active" data-target="panel-compra">Proceso de compra</button>
+            <button class="nav-btn" data-target="panel-proveedores">Proveedores</button>
+            <button class="nav-btn" data-target="panel-cuenta">Cuenta corriente</button>
+            <button class="nav-btn" data-target="panel-pagos">Pago a proveedores</button>
+            <button class="nav-btn" data-target="panel-mayores">Mayores y saldos</button>
+            <button class="nav-btn" data-target="panel-asientos">Registro de asientos</button>
+          </nav>
+
+          <div class="content">
+            <section id="panel-compra" class="panel active">
+              <div class="panel-header">
+                <h2>Proceso de compra</h2>
+                <p>Registración contable de compras y recursos disponibles.</p>
+              </div>
+              <div class="two-columns">
+                <form id="purchase-form" class="card form-card">
+                  <h3>Registrar compra</h3>
+                  <div class="field-grid">
+                    <label>
+                      <span>Proveedor</span>
+                      <select id="purchase-supplier" required></select>
+                    </label>
+                    <label>
+                      <span>Fecha</span>
+                      <input type="date" id="purchase-date" required />
+                    </label>
+                    <label>
+                      <span>Concepto</span>
+                      <input type="text" id="purchase-concept" placeholder="Ej: Mercaderías / Servicios" required />
+                    </label>
+                    <label>
+                      <span>Importe neto</span>
+                      <input type="number" id="purchase-amount" min="0" step="0.01" required />
+                    </label>
+                    <label>
+                      <span>IVA</span>
+                      <input type="number" id="purchase-iva" min="0" step="0.01" required />
+                    </label>
+                  </div>
+                  <button type="submit" class="primary-btn">Guardar compra</button>
+                </form>
+
+                <div class="card list-card">
+                  <h3>Compras registradas</h3>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Proveedor</th>
+                          <th>Fecha</th>
+                          <th>Concepto</th>
+                          <th>Subtotal</th>
+                          <th>IVA</th>
+                          <th>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody id="purchase-table-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section id="panel-proveedores" class="panel">
+              <div class="panel-header">
+                <h2>Proveedores</h2>
+                <p>Alta y mantenimiento de proveedores, además de movimientos contables y cuenta corriente por proveedor.</p>
+              </div>
+
+              <div class="provider-menu card">
+                <div class="provider-menu-header">
+                  <h3>Menú de movimientos</h3>
+                </div>
+                <div class="provider-action-list">
+                  <button class="provider-action active" data-movement="Factura">Registrar factura</button>
+                  <button class="provider-action" data-movement="Nota de crédito">Registrar nota de crédito</button>
+                  <button class="provider-action" data-movement="Débito">Registrar débito</button>
+                  <button class="provider-action" data-movement="Pago">Registrar pago</button>
+                </div>
+              </div>
+
+              <div class="two-columns">
+                <div class="card form-card">
+                  <form id="supplier-form">
+                    <h3>Agregar proveedor</h3>
+                    <div class="field-grid">
+                      <label>
+                        <span>Razón social</span>
+                        <input type="text" id="supplier-name" placeholder="Ej: Distribuidora del Este" required />
+                      </label>
+                      <label>
+                        <span>CUIT</span>
+                        <input type="text" id="supplier-cuit" placeholder="XX-XXXXXXXX-X" required />
+                      </label>
+                      <label>
+                        <span>Contacto</span>
+                        <input type="text" id="supplier-contact" placeholder="Nombre del responsable" />
+                      </label>
+                    </div>
+                    <button type="submit" class="primary-btn">Guardar proveedor</button>
+                  </form>
+
+                  <form id="supplier-movement-form" class="movement-form">
+                    <h3 id="movement-title">Registrar comprobante</h3>
+                    <div class="field-grid">
+                      <label>
+                        <span>Tipo de comprobante</span>
+                        <select id="movement-type" required>
+                          <option value="Factura">Factura</option>
+                          <option value="Nota de crédito">Nota de crédito</option>
+                          <option value="Nota de débito">Nota de débito</option>
+                          <option value="Pago a proveedor">Pago a proveedor</option>
+                          <option value="Asiento manual">Asiento manual</option>
+                        </select>
+                      </label>
+                      <label>
+                        <span>Proveedor</span>
+                        <select id="movement-supplier" required></select>
+                      </label>
+                      <label>
+                        <span>Fecha de comprobante</span>
+                        <input type="date" id="movement-date" required />
+                      </label>
+                      <label>
+                        <span>Vencimiento</span>
+                        <input type="date" id="movement-due-date" required />
+                      </label>
+                      <label>
+                        <span>Moneda</span>
+                        <select id="movement-currency" required>
+                          <option value="UYU">UYU</option>
+                          <option value="USD">USD</option>
+                          <option value="EUR">EUR</option>
+                        </select>
+                      </label>
+                      <label>
+                        <span>Referencia</span>
+                        <input type="text" id="movement-reference" placeholder="F-001 / NC-010 / DP-015" required />
+                      </label>
+                      <label>
+                        <span>Subtotal</span>
+                        <input type="number" id="movement-subtotal" min="0" step="0.01" />
+                      </label>
+                      <label>
+                        <span>IVA (%)</span>
+                        <input type="number" id="movement-iva-rate" min="0" max="100" step="0.01" value="22" />
+                      </label>
+                      <label>
+                        <span>Monto Total</span>
+                        <input type="number" id="movement-amount" min="0" step="0.01" required />
+                      </label>
+                      <label class="full-width">
+                        <span>Detalle</span>
+                        <input type="text" id="movement-detail" placeholder="Ej: Compra de mercadería / ajuste / comprobante" required />
+                      </label>
+                    </div>
+                    <button type="submit" class="primary-btn">Guardar movimiento</button>
+                  </form>
+                </div>
+
+                <div class="card list-card">
+                  <h3>Listado de proveedores</h3>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Proveedor</th>
+                          <th>CUIT</th>
+                          <th>Contacto</th>
+                          <th>Saldo</th>
+                        </tr>
+                      </thead>
+                      <tbody id="supplier-table-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card list-card provider-account-card">
+                <h3>Cuenta corriente por proveedor</h3>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Proveedor</th>
+                        <th>Facturas</th>
+                        <th>Notas crédito</th>
+                        <th>Débitos</th>
+                        <th>Pagos</th>
+                        <th>Saldo</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody id="provider-account-body"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="card list-card wide-card">
+                <h3>Detalles de comprobantes</h3>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Proveedor</th>
+                        <th>Tipo</th>
+                        <th>Referencia</th>
+                        <th>Subtotal</th>
+                        <th>IVA</th>
+                        <th>Total</th>
+                        <th>Moneda</th>
+                        <th>Vencimiento</th>
+                      </tr>
+                    </thead>
+                    <tbody id="voucher-details-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+            <section id="panel-cuenta" class="panel">
+              <div class="panel-header">
+                <h2>Cuenta corriente</h2>
+                <p>Detalle de deuda y pagos por proveedor.</p>
+              </div>
+              <div class="card list-card wide-card">
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Proveedor</th>
+                        <th>Compras</th>
+                        <th>Pagos</th>
+                        <th>Saldo</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody id="current-account-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+            <section id="panel-pagos" class="panel">
+              <div class="panel-header">
+                <h2>Pago a proveedores</h2>
+                <p>Generación de pagos directos desde caja o banco.</p>
+              </div>
+              <div class="two-columns">
+                <form id="payment-form" class="card form-card">
+                  <h3>Registrar pago</h3>
+                  <div class="field-grid">
+                    <label>
+                      <span>Proveedor</span>
+                      <select id="payment-supplier" required></select>
+                    </label>
+                    <label>
+                      <span>Fecha</span>
+                      <input type="date" id="payment-date" required />
+                    </label>
+                    <label>
+                      <span>Medio</span>
+                      <select id="payment-method" required>
+                        <option value="Banco">Banco</option>
+                        <option value="Efectivo">Efectivo</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Monto</span>
+                      <input type="number" id="payment-amount" min="0" step="0.01" required />
+                    </label>
+                  </div>
+                  <button type="submit" class="primary-btn">Registrar pago</button>
+                </form>
+
+                <div class="card list-card">
+                  <h3>Pagos registrados</h3>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Proveedor</th>
+                          <th>Fecha</th>
+                          <th>Medio</th>
+                          <th>Monto</th>
+                        </tr>
+                      </thead>
+                      <tbody id="payment-table-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section id="panel-mayores" class="panel">
+              <div class="panel-header">
+                <h2>Mayores y saldos</h2>
+                <p>Movimiento acumulado por cuenta contable.</p>
+              </div>
+              <div class="card list-card wide-card">
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Cuenta</th>
+                        <th>Debe</th>
+                        <th>Haber</th>
+                        <th>Saldo</th>
+                      </tr>
+                    </thead>
+                    <tbody id="ledger-table-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+            <section id="panel-asientos" class="panel">
+              <div class="panel-header">
+                <h2>Registro de asientos</h2>
+                <p>Asientos manuales con cuentas y movimientos.</p>
+              </div>
+              <div class="two-columns">
+                <form id="journal-form" class="card form-card">
+                  <h3>Nuevo asiento</h3>
+                  <div class="field-grid">
+                    <label>
+                      <span>Fecha</span>
+                      <input type="date" id="journal-date" required />
+                    </label>
+                    <label>
+                      <span>Detalle</span>
+                      <input type="text" id="journal-detail" placeholder="Ej: Ajuste de IVA / pago de servicio" required />
+                    </label>
+                    <label>
+                      <span>Cuenta 1</span>
+                      <select id="journal-account-1" required></select>
+                    </label>
+                    <label>
+                      <span>Movimiento</span>
+                      <select id="journal-type-1" required>
+                        <option value="Debe">Debe</option>
+                        <option value="Haber">Haber</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Monto 1</span>
+                      <input type="number" id="journal-amount-1" min="0" step="0.01" required />
+                    </label>
+                    <label>
+                      <span>Cuenta 2</span>
+                      <select id="journal-account-2" required></select>
+                    </label>
+                    <label>
+                      <span>Movimiento</span>
+                      <select id="journal-type-2" required>
+                        <option value="Haber">Haber</option>
+                        <option value="Debe">Debe</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Monto 2</span>
+                      <input type="number" id="journal-amount-2" min="0" step="0.01" required />
+                    </label>
+                  </div>
+                  <button type="submit" class="primary-btn">Guardar asiento</button>
+                </form>
+
+                <div class="card list-card">
+                  <h3>Asientos del período</h3>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Fecha</th>
+                          <th>Detalle</th>
+                          <th>Concepto</th>
+                          <th>Importe</th>
+                        </tr>
+                      </thead>
+                      <tbody id="journal-table-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section id="clients-screen" class="view">
+          <nav class="nav-tabs" aria-label="Paneles de clientes">
+            <button class="nav-btn active" data-target="panel-ventas">Proceso de ventas</button>
+            <button class="nav-btn" data-target="panel-clientes">Clientes</button>
+            <button class="nav-btn" data-target="panel-cuenta-clientes">Cuenta corriente clientes</button>
+            <button class="nav-btn" data-target="panel-cobranzas">Cobranzas</button>
+            <button class="nav-btn" data-target="panel-mayores-clientes">Mayores y saldos</button>
+          </nav>
+
+          <div class="content">
+            <section id="panel-ventas" class="panel active">
+              <div class="panel-header">
+                <h2>Proceso de ventas</h2>
+                <p>Registración contable de ventas y facturación.</p>
+              </div>
+              <div class="two-columns">
+                <form id="sales-form" class="card form-card">
+                  <h3>Registrar venta</h3>
+                  <div class="field-grid">
+                    <label>
+                      <span>Cliente</span>
+                      <select id="sales-client" required></select>
+                    </label>
+                    <label>
+                      <span>Fecha</span>
+                      <input type="date" id="sales-date" required />
+                    </label>
+                    <label>
+                      <span>Concepto</span>
+                      <input type="text" id="sales-concept" placeholder="Ej: Venta de mercaderías / Servicios" required />
+                    </label>
+                    <label>
+                      <span>Importe neto</span>
+                      <input type="number" id="sales-amount" min="0" step="0.01" required />
+                    </label>
+                    <label>
+                      <span>IVA</span>
+                      <input type="number" id="sales-iva" min="0" step="0.01" required />
+                    </label>
+                  </div>
+                  <button type="submit" class="primary-btn">Guardar venta</button>
+                </form>
+
+                <div class="card list-card">
+                  <h3>Ventas registradas</h3>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Cliente</th>
+                          <th>Fecha</th>
+                          <th>Concepto</th>
+                          <th>Subtotal</th>
+                          <th>IVA</th>
+                          <th>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody id="sales-table-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section id="panel-clientes" class="panel">
+              <div class="panel-header">
+                <h2>Clientes</h2>
+                <p>Alta y mantenimiento de clientes, además de movimientos contables y cuenta corriente por cliente.</p>
+              </div>
+
+              <div class="provider-menu card">
+                <div class="provider-menu-header">
+                  <h3>Menú de movimientos</h3>
+                </div>
+                <div class="provider-action-list">
+                  <button class="client-action active" data-movement="Factura">Emitir factura</button>
+                  <button class="client-action" data-movement="Nota de crédito">Registrar nota de crédito</button>
+                  <button class="client-action" data-movement="Débito">Registrar débito</button>
+                  <button class="client-action" data-movement="Cobranza">Registrar cobranza</button>
+                </div>
+              </div>
+
+              <div class="two-columns">
+                <div class="card form-card">
+                  <form id="client-form">
+                    <h3>Agregar cliente</h3>
+                    <div class="field-grid">
+                      <label>
+                        <span>Razón social</span>
+                        <input type="text" id="client-name" placeholder="Ej: Juan Pérez SRL" required />
+                      </label>
+                      <label>
+                        <span>CI/RUT</span>
+                        <input type="text" id="client-rut" placeholder="XXXXXXX-X" required />
+                      </label>
+                      <label>
+                        <span>Contacto</span>
+                        <input type="text" id="client-contact" placeholder="Nombre del responsable" />
+                      </label>
+                    </div>
+                    <button type="submit" class="primary-btn">Guardar cliente</button>
+                  </form>
+
+                  <form id="client-movement-form" class="movement-form">
+                    <h3 id="client-movement-title">Emitir factura</h3>
+                    <div class="field-grid">
+                      <label>
+                        <span>Tipo de comprobante</span>
+                        <select id="client-movement-type" required>
+                          <option value="Factura">Factura</option>
+                          <option value="Nota de crédito">Nota de crédito</option>
+                          <option value="Nota de débito">Nota de débito</option>
+                          <option value="Cobranza">Cobranza</option>
+                          <option value="Asiento manual">Asiento manual</option>
+                        </select>
+                      </label>
+                      <label>
+                        <span>Cliente</span>
+                        <select id="client-movement-client" required></select>
+                      </label>
+                      <label>
+                        <span>Fecha de comprobante</span>
+                        <input type="date" id="client-movement-date" required />
+                      </label>
+                      <label>
+                        <span>Vencimiento</span>
+                        <input type="date" id="client-movement-due-date" required />
+                      </label>
+                      <label>
+                        <span>Moneda</span>
+                        <select id="client-movement-currency" required>
+                          <option value="UYU">UYU</option>
+                          <option value="USD">USD</option>
+                          <option value="EUR">EUR</option>
+                        </select>
+                      </label>
+                      <label>
+                        <span>Referencia</span>
+                        <input type="text" id="client-movement-reference" placeholder="F-001 / NC-010 / CC-015" required />
+                      </label>
+                      <label>
+                        <span>Subtotal</span>
+                        <input type="number" id="client-movement-subtotal" min="0" step="0.01" />
+                      </label>
+                      <label>
+                        <span>IVA (%)</span>
+                        <input type="number" id="client-movement-iva-rate" min="0" max="100" step="0.01" value="22" />
+                      </label>
+                      <label>
+                        <span>Monto Total</span>
+                        <input type="number" id="client-movement-amount" min="0" step="0.01" required />
+                      </label>
+                      <label class="full-width">
+                        <span>Detalle</span>
+                        <input type="text" id="client-movement-detail" placeholder="Ej: Venta de mercaderías / ajuste / comprobante" required />
+                      </label>
+                    </div>
+                    <button type="submit" class="primary-btn">Guardar movimiento</button>
+                  </form>
+                </div>
+
+                <div class="card list-card">
+                  <h3>Listado de clientes</h3>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Cliente</th>
+                          <th>RUT/CI</th>
+                          <th>Contacto</th>
+                          <th>Saldo</th>
+                        </tr>
+                      </thead>
+                      <tbody id="client-table-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card list-card provider-account-card">
+                <h3>Cuenta corriente por cliente</h3>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Cliente</th>
+                        <th>Facturas</th>
+                        <th>Notas crédito</th>
+                        <th>Débitos</th>
+                        <th>Cobranzas</th>
+                        <th>Saldo</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody id="client-account-body"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="card list-card wide-card">
+                <h3>Detalles de comprobantes emitidos</h3>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Cliente</th>
+                        <th>Tipo</th>
+                        <th>Referencia</th>
+                        <th>Subtotal</th>
+                        <th>IVA</th>
+                        <th>Total</th>
+                        <th>Moneda</th>
+                        <th>Vencimiento</th>
+                      </tr>
+                    </thead>
+                    <tbody id="client-voucher-details-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+            <section id="panel-cuenta-clientes" class="panel">
+              <div class="panel-header">
+                <h2>Cuenta corriente de clientes</h2>
+                <p>Detalle de saldo a cobrar y pagos recibidos por cliente.</p>
+              </div>
+              <div class="card list-card wide-card">
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Cliente</th>
+                        <th>Ventas</th>
+                        <th>Cobranzas</th>
+                        <th>Saldo</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody id="client-current-account-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+            <section id="panel-cobranzas" class="panel">
+              <div class="panel-header">
+                <h2>Cobranzas</h2>
+                <p>Registración de cobranzas recibidas de clientes.</p>
+              </div>
+              <div class="two-columns">
+                <form id="collection-form" class="card form-card">
+                  <h3>Registrar cobranza</h3>
+                  <div class="field-grid">
+                    <label>
+                      <span>Cliente</span>
+                      <select id="collection-client" required></select>
+                    </label>
+                    <label>
+                      <span>Fecha</span>
+                      <input type="date" id="collection-date" required />
+                    </label>
+                    <label>
+                      <span>Método</span>
+                      <select id="collection-method" required>
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="Banco">Banco</option>
+                        <option value="Cheque">Cheque</option>
+                        <option value="Transferencia">Transferencia</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Monto</span>
+                      <input type="number" id="collection-amount" min="0" step="0.01" required />
+                    </label>
+                  </div>
+                  <button type="submit" class="primary-btn">Guardar cobranza</button>
+                </form>
+
+                <div class="card list-card">
+                  <h3>Cobranzas registradas</h3>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Cliente</th>
+                          <th>Fecha</th>
+                          <th>Método</th>
+                          <th>Monto</th>
+                        </tr>
+                      </thead>
+                      <tbody id="collection-table-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section id="panel-mayores-clientes" class="panel">
+              <div class="panel-header">
+                <h2>Mayores y saldos</h2>
+                <p>Resumen contable de ventas, cobranzas y saldos pendientes.</p>
+              </div>
+              <div class="card list-card wide-card">
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Cuenta</th>
+                        <th>Debe</th>
+                        <th>Haber</th>
+                        <th>Saldo</th>
+                      </tr>
+                    </thead>
+                    <tbody id="client-ledger-table-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
