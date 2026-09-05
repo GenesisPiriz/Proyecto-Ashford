@@ -1,0 +1,36 @@
+{
+  "name": "proyecto-ashford",
+  "version": "1.0.0",
+  "description": "Sistema Contable para emprendimientos",
+  "main": "app.js",
+  "scripts": {
+    "start": "node server.js",
+    "app:sync": "npm run web:sync && npx cap sync",
+    "web:sync": "cp index.html app.js styles.css manifest.webmanifest icon.svg api-config.js service-worker.js \"Logo Ashford.png\" www/",
+    "app:android": "npm run app:sync && npx cap open android",
+    "app:ios": "npm run app:sync && npx cap open ios",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GenesisPiriz/Proyecto-Ashford.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/GenesisPiriz/Proyecto-Ashford/issues"
+  },
+  "homepage": "https://github.com/GenesisPiriz/Proyecto-Ashford#readme",
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/ios": "^8.5.1",
+    "playwright-core": "^1.62.1"
+  }
+}

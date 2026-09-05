@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: ashford-contable
+    runtime: node
+    plan: starter
+    region: oregon
+    branch: main
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ADMIN_EMAIL
+        value: admin@ashford.local
+      - key: MANAGER_EMAIL
+        value: joyeriagenesis.uy@gmail.com
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: MANAGER_PASSWORD
+        generateValue: true
+    disk:
+      name: ashford-data
+      mountPath: /opt/render/project/src/.data
+      sizeGB: 1
