@@ -188,6 +188,7 @@ let state = loadState();
 let invoiceDraft = [];
 let selectedCalendarDate = "";
 let selectedCurrentAccountSupplierId = "";
+let selectedCurrentAccountClientId = "";
 let accountPlanEditMode = false;
 
 if (Array.isArray(state.accountPlan) && state.accountPlan.length) {
@@ -197,6 +198,28 @@ if (Array.isArray(state.accountPlan) && state.accountPlan.length) {
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("es-UY", { style: "currency", currency: "UYU" }).format(Number(value || 0));
+}
+
+const CURRENCY_LOCALES = { UYU: "es-UY", USD: "en-US", EUR: "de-DE" };
+
+function formatCurrencyByCode(value, currencyCode) {
+  const code = CURRENCY_LOCALES[currencyCode] ? currencyCode : "UYU";
+  return new Intl.NumberFormat(CURRENCY_LOCALES[code], { style: "currency", currency: code }).format(Number(value || 0));
+}
+
+function buildCurrencySubtotalRows(currencyTotals, runningBalance, columnsBeforeTotals, columnsAfterTotals, saldoSign = 1) {
+  return Object.keys(currencyTotals)
+    .sort()
+    .map((currency) => `
+      <tr class="subtotal-row">
+        <td colspan="${columnsBeforeTotals}"><strong>Subtotal ${currency}</strong></td>
+        <td class="amount"><strong>${formatCurrencyByCode(currencyTotals[currency].debe, currency)}</strong></td>
+        <td class="amount"><strong>${formatCurrencyByCode(currencyTotals[currency].haber, currency)}</strong></td>
+        <td class="amount"><strong>${formatCurrencyByCode(runningBalance[currency] * saldoSign, currency)}</strong></td>
+        <td colspan="${columnsAfterTotals}"></td>
+      </tr>
+    `)
+    .join("");
 }
 
 function getSupplierName(supplierId) {
@@ -248,7 +271,7 @@ function getSupplierBalances() {
 
     const facturas = state.supplierMovements
       .filter((movement) => movement.supplierId === supplier.id && movement.type === "Factura")
-      .reduce((sum, movement) => sum + Number(movement.amount || 0), 0) + purchaseTotal;
+      .reduce((sum, movement) => sum + Number(movement.amount || 0), 0);
 
     const notasCredito = state.supplierMovements
       .filter((movement) => movement.supplierId === supplier.id && movement.type === "Nota de crédito")
@@ -260,7 +283,7 @@ function getSupplierBalances() {
 
     const pagos = state.supplierMovements
       .filter((movement) => movement.supplierId === supplier.id && movement.type === "Pago")
-      .reduce((sum, movement) => sum + Number(movement.amount || 0), 0) + paymentTotal;
+      .reduce((sum, movement) => sum + Number(movement.amount || 0), 0);
 
     const saldo = facturas + debitos - notasCredito - pagos;
     const createdBy = [...new Set([
@@ -320,7 +343,7 @@ function buildLedgerRows() {
   return Array.from(rows.values()).map((row) => ({
     ...row,
     createdBy: Array.from(row.createdBy).join(", ") || "Sistema",
-    saldo: row.Debe - row.Haber,
+    saldo: getAccountNature(row.account) === "Acreedora" ? row.Haber - row.Debe : row.Debe - row.Haber,
   }));
 }
 
@@ -369,7 +392,7 @@ function getClientBalances() {
 
     const facturas = state.clientMovements
       .filter((movement) => movement.clientId === client.id && movement.type === "Factura")
-      .reduce((sum, movement) => sum + Number(movement.amount || 0), 0) + salesTotal;
+      .reduce((sum, movement) => sum + Number(movement.amount || 0), 0);
 
     const notasCredito = state.clientMovements
       .filter((movement) => movement.clientId === client.id && movement.type === "Nota de crédito")
@@ -381,7 +404,7 @@ function getClientBalances() {
 
     const cobranzas = state.clientMovements
       .filter((movement) => movement.clientId === client.id && movement.type === "Cobranza")
-      .reduce((sum, movement) => sum + Number(movement.amount || 0), 0) + collectionTotal;
+      .reduce((sum, movement) => sum + Number(movement.amount || 0), 0);
 
     const saldo = facturas + debitos - notasCredito - cobranzas;
     const createdBy = [...new Set([
@@ -435,7 +458,7 @@ function buildClientLedgerRows() {
   return Array.from(rows.values()).map((row) => ({
     ...row,
     createdBy: Array.from(row.createdBy).join(", ") || "Sistema",
-    saldo: row.Debe - row.Haber,
+    saldo: getAccountNature(row.account) === "Acreedora" ? row.Haber - row.Debe : row.Debe - row.Haber,
   }));
 }
 
@@ -711,7 +734,7 @@ function renderSupplierTable() {
   body.innerHTML = balances
     .map((supplier) => {
       const statusClass = supplier.saldo > 0 ? "warn" : "ok";
-      const statusText = supplier.saldo > 0 ? "Debe" : "Al día";
+      const statusText = supplier.saldo > 0 ? "Saldo Acreedor" : (supplier.saldo < 0 ? "A favor" : "Al día");
       return `
         <tr>
           <td>${supplier.name}</td>
@@ -724,12 +747,47 @@ function renderSupplierTable() {
           <td>${supplier.notes || "-"}</td>
           <td class="amount">
             <span class="status ${statusClass}">${statusText}</span>
-            <div>${formatCurrency(supplier.saldo)}</div>
+            <div>${formatCurrency(-supplier.saldo)}</div>
           </td>
         </tr>
       `;
     })
     .join("");
+}
+
+function getSupplierLedgerData(supplierId) {
+  const supplier = state.suppliers.find((item) => item.id === supplierId);
+  const balance = getSupplierBalances().find((item) => item.id === supplierId);
+  if (!supplier || !balance) return null;
+
+  const movements = state.supplierMovements
+    .filter((movement) => movement.supplierId === supplier.id)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+  state.purchases
+    .filter((purchase) => purchase.proveedorId === supplier.id)
+    .filter((purchase) => !movements.some((movement) => movement.date === purchase.date && movement.type === "Factura" && Number(movement.amount) === Number(purchase.total)))
+    .forEach((purchase) => movements.push({ date: purchase.date, type: "Factura", reference: "Compra", detail: purchase.concept, amount: purchase.total, currency: purchase.currency || "UYU", createdBy: purchase.createdBy || "Sistema" }));
+  state.payments
+    .filter((payment) => payment.proveedorId === supplier.id)
+    .filter((payment) => !movements.some((movement) => movement.date === payment.date && ["Pago", "Pago a proveedor"].includes(movement.type) && Number(movement.amount) === Number(payment.amount)))
+    .forEach((payment) => movements.push({ date: payment.date, type: "Pago", reference: "Pago", detail: payment.method, amount: payment.amount, currency: payment.currency || "UYU", createdBy: payment.createdBy || "Sistema" }));
+  movements.sort((a, b) => new Date(a.date) - new Date(b.date));
+  const runningBalance = {};
+  const currencyTotals = {};
+  const rows = movements.map((movement) => {
+    // En pasivos/proveedores: Facturas y débitos acreditan (Haber), Pagos y notas de crédito debitan (Debe)
+    const currency = movement.currency || "UYU";
+    const isDebit = ["Pago", "Pago a proveedor", "Nota de crédito"].includes(movement.type);
+    const debe = isDebit ? Number(movement.amount || 0) : 0;
+    const haber = isDebit ? 0 : Number(movement.amount || 0);
+    runningBalance[currency] = (runningBalance[currency] || 0) + haber - debe;
+    if (!currencyTotals[currency]) currencyTotals[currency] = { debe: 0, haber: 0 };
+    currencyTotals[currency].debe += debe;
+    currencyTotals[currency].haber += haber;
+    return { movement, debe, haber, currency, saldoMoneda: runningBalance[currency] };
+  });
+
+  return { supplier, balance, rows, currencyTotals, runningBalance };
 }
 
 function renderCurrentAccounts() {
@@ -762,33 +820,12 @@ function renderCurrentAccounts() {
     .join("");
   selector.value = selectedCurrentAccountSupplierId;
 
-  const supplier = state.suppliers.find((item) => item.id === selectedCurrentAccountSupplierId);
-  const balance = getSupplierBalances().find((item) => item.id === selectedCurrentAccountSupplierId);
-  if (!supplier || !balance) return;
-
-  const movements = state.supplierMovements
-    .filter((movement) => movement.supplierId === supplier.id)
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
-  state.purchases
-    .filter((purchase) => purchase.proveedorId === supplier.id)
-    .filter((purchase) => !movements.some((movement) => movement.date === purchase.date && movement.type === "Factura" && Number(movement.amount) === Number(purchase.total)))
-    .forEach((purchase) => movements.push({ date: purchase.date, type: "Factura", reference: "Compra", detail: purchase.concept, amount: purchase.total, createdBy: purchase.createdBy || "Sistema" }));
-  state.payments
-    .filter((payment) => payment.proveedorId === supplier.id)
-    .filter((payment) => !movements.some((movement) => movement.date === payment.date && ["Pago", "Pago a proveedor"].includes(movement.type) && Number(movement.amount) === Number(payment.amount)))
-    .forEach((payment) => movements.push({ date: payment.date, type: "Pago", reference: "Pago", detail: payment.method, amount: payment.amount, createdBy: payment.createdBy || "Sistema" }));
-  movements.sort((a, b) => new Date(a.date) - new Date(b.date));
-  let runningBalance = 0;
-  const rows = movements.map((movement) => {
-    const isCredit = ["Pago", "Pago a proveedor", "Nota de crédito"].includes(movement.type);
-    const debe = isCredit ? 0 : Number(movement.amount || 0);
-    const haber = isCredit ? Number(movement.amount || 0) : 0;
-    runningBalance += debe - haber;
-    return { movement, debe, haber, runningBalance };
-  });
+  const ledger = getSupplierLedgerData(selectedCurrentAccountSupplierId);
+  if (!ledger) return;
+  const { supplier, balance, rows, currencyTotals, runningBalance } = ledger;
 
   const status = balance.saldo > 0 ? "warn" : "ok";
-  const label = balance.saldo > 0 ? "Debe" : "Al día";
+  const label = balance.saldo > 0 ? "Saldo Acreedor" : (balance.saldo < 0 ? "A favor" : "Al día");
   detail.innerHTML = `
     <div class="card provider-account-summary">
       <div>
@@ -801,25 +838,32 @@ function renderCurrentAccounts() {
         <span>Notas de crédito ${formatCurrency(balance.notasCredito)}</span>
         <span>Débitos ${formatCurrency(balance.debitos)}</span>
         <span>Pagos ${formatCurrency(balance.pagos)}</span>
-        <strong class="status ${status}">${label}: ${formatCurrency(balance.saldo)}</strong>
+        <strong class="status ${status}">${label}: ${formatCurrency(-balance.saldo)}</strong>
       </div>
+      <button type="button" class="secondary-btn" id="export-supplier-account-excel">Exportar a Excel</button>
     </div>
   `;
 
+  const subtotalRows = buildCurrencySubtotalRows(currencyTotals, runningBalance, 6, 1, -1);
   body.innerHTML = rows.length
-    ? rows.map(({ movement, debe, haber, runningBalance }) => `
+    ? rows.map(({ movement, debe, haber, currency, saldoMoneda }) => `
         <tr>
           <td>${movement.date}</td>
           <td>${movement.type}</td>
           <td>${movement.reference || "-"}</td>
           <td>${movement.detail || "-"}</td>
-          <td class="amount">${formatCurrency(debe)}</td>
-          <td class="amount">${formatCurrency(haber)}</td>
-          <td class="amount">${formatCurrency(runningBalance)}</td>
+          <td class="amount">${formatCurrencyByCode(movement.amount, currency)}</td>
+          <td>${currency}</td>
+          <td class="amount">${formatCurrencyByCode(debe, currency)}</td>
+          <td class="amount">${formatCurrencyByCode(haber, currency)}</td>
+          <td class="amount">${formatCurrencyByCode(-saldoMoneda, currency)}</td>
           <td>${movement.createdBy || "Sistema"}</td>
         </tr>
-      `).join("")
-    : `<tr><td colspan="8">No hay movimientos registrados para este proveedor.</td></tr>`;
+      `).join("") + subtotalRows
+    : `<tr><td colspan="10">No hay movimientos registrados para este proveedor.</td></tr>`;
+
+  const exportBtn = document.getElementById("export-supplier-account-excel");
+  if (exportBtn) exportBtn.addEventListener("click", () => exportSupplierCurrentAccountExcel(selectedCurrentAccountSupplierId));
 }
 
 function renderPaymentTable() {
@@ -930,7 +974,7 @@ function renderClientTable() {
   body.innerHTML = balances
     .map((client) => {
       const statusClass = client.saldo > 0 ? "warn" : "ok";
-      const statusText = client.saldo > 0 ? "Debe" : "Cobrado";
+      const statusText = client.saldo > 0 ? "Deudor" : (client.saldo < 0 ? "Acreedor" : "Al día");
       return `
         <tr>
           <td>${client.name}</td>
@@ -951,14 +995,125 @@ function renderClientTable() {
     .join("");
 }
 
+function getClientLedgerData(clientId) {
+  const client = state.clients.find((item) => item.id === clientId);
+  const balance = getClientBalances().find((item) => item.id === clientId);
+  if (!client || !balance) return null;
+
+  const movements = state.clientMovements
+    .filter((movement) => movement.clientId === client.id)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+  state.sales
+    .filter((sale) => sale.clientId === client.id)
+    .filter((sale) => !movements.some((movement) => movement.date === sale.date && movement.type === "Factura" && Number(movement.amount) === Number(sale.total)))
+    .forEach((sale) => movements.push({ date: sale.date, type: "Factura", reference: "Venta", detail: sale.concept, amount: sale.total, currency: sale.currency || "UYU", createdBy: sale.createdBy || "Sistema" }));
+  state.collections
+    .filter((collection) => collection.clientId === client.id)
+    .filter((collection) => !movements.some((movement) => movement.date === collection.date && movement.type === "Cobranza" && Number(movement.amount) === Number(collection.amount)))
+    .forEach((collection) => movements.push({ date: collection.date, type: "Cobranza", reference: "Cobranza", detail: collection.method, amount: collection.amount, currency: collection.currency || "UYU", createdBy: collection.createdBy || "Sistema" }));
+  movements.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  const runningBalance = {};
+  const currencyTotals = {};
+  const rows = movements.map((movement) => {
+    // En activos/clientes: Facturas y débitos aumentan el saldo (Debe), notas de crédito y cobranzas lo reducen (Haber)
+    const currency = movement.currency || "UYU";
+    const isCredit = ["Nota de crédito", "Cobranza"].includes(movement.type);
+    const debe = isCredit ? 0 : Number(movement.amount || 0);
+    const haber = isCredit ? Number(movement.amount || 0) : 0;
+    runningBalance[currency] = (runningBalance[currency] || 0) + debe - haber;
+    if (!currencyTotals[currency]) currencyTotals[currency] = { debe: 0, haber: 0 };
+    currencyTotals[currency].debe += debe;
+    currencyTotals[currency].haber += haber;
+    return { movement, debe, haber, currency, saldoMoneda: runningBalance[currency] };
+  });
+
+  return { client, balance, rows, currencyTotals, runningBalance };
+}
+
+function renderClientCurrentAccountDetail() {
+  const body = document.getElementById("current-account-client-body");
+  const selector = document.getElementById("current-account-client");
+  const search = document.getElementById("current-account-client-search");
+  const detail = document.getElementById("current-account-client-detail");
+  if (!body || !selector || !detail) return;
+
+  if (!state.clients.length) {
+    selector.innerHTML = "<option value=\"\">No hay clientes cargados</option>";
+    detail.innerHTML = "<div class=\"card\">No hay clientes para consultar.</div>";
+    body.innerHTML = "";
+    return;
+  }
+
+  const searchTerm = search?.value.trim().toLowerCase() || "";
+  const filteredClients = state.clients.filter((client) => client.name.toLowerCase().includes(searchTerm));
+  if (!filteredClients.length) {
+    selector.innerHTML = "<option value=\"\">Sin coincidencias</option>";
+    detail.innerHTML = `<div class="card">No se encontró un cliente para “${search.value}”.</div>`;
+    body.innerHTML = "";
+    return;
+  }
+  if (!selectedCurrentAccountClientId || !filteredClients.some((client) => client.id === selectedCurrentAccountClientId)) {
+    selectedCurrentAccountClientId = filteredClients[0].id;
+  }
+  selector.innerHTML = filteredClients
+    .map((client) => `<option value="${client.id}">${client.name}</option>`)
+    .join("");
+  selector.value = selectedCurrentAccountClientId;
+
+  const ledger = getClientLedgerData(selectedCurrentAccountClientId);
+  if (!ledger) return;
+  const { client, balance, rows, currencyTotals, runningBalance } = ledger;
+
+  const status = balance.saldo > 0 ? "warn" : "ok";
+  const label = balance.saldo > 0 ? "Deudor" : (balance.saldo < 0 ? "Acreedor" : "Al día");
+  detail.innerHTML = `
+    <div class="card provider-account-summary">
+      <div>
+        <span class="eyebrow">Cliente seleccionado</span>
+        <h3>${client.name}</h3>
+        <p>RUT/CI: ${client.rut} · Contacto: ${client.contact || "-"}</p>
+      </div>
+      <div class="provider-account-totals">
+        <span>Facturas ${formatCurrency(balance.facturas)}</span>
+        <span>Notas de crédito ${formatCurrency(balance.notasCredito)}</span>
+        <span>Débitos ${formatCurrency(balance.debitos)}</span>
+        <span>Cobranzas ${formatCurrency(balance.cobranzas)}</span>
+        <strong class="status ${status}">${label}: ${formatCurrency(balance.saldo)}</strong>
+      </div>
+      <button type="button" class="secondary-btn" id="export-client-account-excel">Exportar a Excel</button>
+    </div>
+  `;
+
+  const subtotalRows = buildCurrencySubtotalRows(currencyTotals, runningBalance, 6, 1);
+  body.innerHTML = rows.length
+    ? rows.map(({ movement, debe, haber, currency, saldoMoneda }) => `
+        <tr>
+          <td>${movement.date}</td>
+          <td>${movement.type}</td>
+          <td>${movement.reference || "-"}</td>
+          <td>${movement.detail || "-"}</td>
+          <td class="amount">${formatCurrencyByCode(movement.amount, currency)}</td>
+          <td>${currency}</td>
+          <td class="amount">${formatCurrencyByCode(debe, currency)}</td>
+          <td class="amount">${formatCurrencyByCode(haber, currency)}</td>
+          <td class="amount">${formatCurrencyByCode(saldoMoneda, currency)}</td>
+          <td>${movement.createdBy || "Sistema"}</td>
+        </tr>
+      `).join("") + subtotalRows
+    : `<tr><td colspan="10">No hay movimientos registrados para este cliente.</td></tr>`;
+
+  const exportBtn = document.getElementById("export-client-account-excel");
+  if (exportBtn) exportBtn.addEventListener("click", () => exportClientCurrentAccountExcel(selectedCurrentAccountClientId));
+}
+
 function renderClientAccountTable() {
   const body = document.getElementById("client-account-body");
   const balances = sortBalancesBySaldoDesc(getClientBalances());
-
   body.innerHTML = balances
     .map((client) => {
       const status = client.saldo > 0 ? "warn" : "ok";
-      const label = client.saldo > 0 ? "Debe" : "Cobrado";
+      const label = client.saldo > 0 ? "Deudor" : (client.saldo < 0 ? "Acreedor" : "Al día");
       return `
         <tr>
           <td>${client.name}</td>
@@ -966,8 +1121,10 @@ function renderClientAccountTable() {
           <td class="amount">${formatCurrency(client.notasCredito)}</td>
           <td class="amount">${formatCurrency(client.debitos)}</td>
           <td class="amount">${formatCurrency(client.cobranzas)}</td>
-          <td class="amount">${formatCurrency(client.saldo)}</td>
-          <td><span class="status ${status}">${label}</span></td>
+          <td class="amount">
+            <span class="status ${status}">${label}</span>
+            <div>${formatCurrency(client.saldo)}</div>
+          </td>
           <td>${client.createdBy}</td>
         </tr>
       `;
@@ -982,14 +1139,16 @@ function renderClientCurrentAccounts() {
   body.innerHTML = balances
     .map((client) => {
       const status = client.saldo > 0 ? "warn" : "ok";
-      const label = client.saldo > 0 ? "Debe" : "Cobrado";
+      const label = client.saldo > 0 ? "Deudor" : (client.saldo < 0 ? "Acreedor" : "Al día");
       return `
         <tr>
           <td>${client.name}</td>
           <td class="amount">${formatCurrency(client.ventas)}</td>
           <td class="amount">${formatCurrency(client.cobranzas)}</td>
-          <td class="amount">${formatCurrency(client.saldo)}</td>
-          <td><span class="status ${status}">${label}</span></td>
+          <td class="amount">
+            <span class="status ${status}">${label}</span>
+            <div>${formatCurrency(client.saldo)}</div>
+          </td>
           <td>${client.createdBy}</td>
         </tr>
       `;
@@ -1270,7 +1429,13 @@ function renderClientVoucherDetailsTable() {
   const body = document.getElementById("client-voucher-details-body");
   if (!body) return;
 
-  body.innerHTML = sortMovementsByDueDateAsc(state.clientMovements)
+  const movements = sortMovementsByDueDateAsc(state.clientMovements);
+  if (!movements.length) {
+    body.innerHTML = `<tr><td colspan="11" style="text-align:center; padding: 16px;">No hay comprobantes emitidos.</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = movements
     .map((movement) => {
       const subtotal = Number(movement.subtotal || 0);
       const ivaRate = Number(movement.ivaRate || 0);
@@ -1289,6 +1454,11 @@ function renderClientVoucherDetailsTable() {
           <td>${movement.currency || "UYU"}</td>
           <td>${movement.dueDate || "-"}</td>
           <td>${movement.createdBy || "Sistema"}</td>
+          <td>
+            <button type="button" class="download-voucher-btn" data-client-voucher-id="${movement.id}" title="Descargar comprobante en PDF">
+              Descargar PDF
+            </button>
+          </td>
         </tr>
       `;
     })
@@ -1626,7 +1796,7 @@ function renderProviderAccountTable() {
   body.innerHTML = balances
     .map((supplier) => {
       const status = supplier.saldo > 0 ? "warn" : "ok";
-      const label = supplier.saldo > 0 ? "Debe" : "Al día";
+      const label = supplier.saldo > 0 ? "Saldo Acreedor" : (supplier.saldo < 0 ? "A favor" : "Al día");
       return `
         <tr>
           <td>${supplier.name}</td>
@@ -1634,7 +1804,7 @@ function renderProviderAccountTable() {
           <td class="amount">${formatCurrency(supplier.notasCredito)}</td>
           <td class="amount">${formatCurrency(supplier.debitos)}</td>
           <td class="amount">${formatCurrency(supplier.pagos)}</td>
-          <td class="amount">${formatCurrency(supplier.saldo)}</td>
+          <td class="amount">${formatCurrency(-supplier.saldo)}</td>
           <td><span class="status ${status}">${label}</span></td>
           <td>${supplier.createdBy}</td>
         </tr>
@@ -1675,6 +1845,19 @@ function getAccountClassification(account) {
   };
 
   return map[account] || "Activo";
+}
+
+function getAccountNature(accountName) {
+  const accountObj = accountByName.get(accountName);
+  if (accountObj) {
+    if (accountObj.chapter === "Pasivos" || accountObj.chapter === "Ganancias") return "Acreedora";
+    if (accountObj.chapter === "Activos" || accountObj.chapter === "Pérdidas") return "Deudora";
+  }
+  const classification = getAccountClassification(accountName);
+  if (["Pasivo", "Ganancias"].includes(classification) || accountName === "Ventas" || accountName === "IVA Débito") {
+    return "Acreedora";
+  }
+  return "Deudora";
 }
 
 function getDateWindow(periodValue) {
@@ -1802,7 +1985,7 @@ function buildAccountSummaryRows() {
   return Array.from(rows.values())
     .map((row) => ({
       ...row,
-      saldo: row.Debe - row.Haber,
+      saldo: getAccountNature(row.account) === "Acreedora" ? row.Haber - row.Debe : row.Debe - row.Haber,
     }))
     .sort((a, b) => a.account.localeCompare(b.account));
 }
@@ -1989,7 +2172,10 @@ function buildPeriodRows(startDate, endDate) {
     addLine("Cuenta Corriente Clientes", "Haber", collection.amount, collection.date);
   });
 
-  return Array.from(rows.values()).map((row) => ({ ...row, saldo: row.Debe - row.Haber }));
+  return Array.from(rows.values()).map((row) => ({
+    ...row,
+    saldo: getAccountNature(row.account) === "Acreedora" ? row.Haber - row.Debe : row.Debe - row.Haber,
+  }));
 }
 
 async function exportAccountingReportPdf() {
@@ -2014,6 +2200,113 @@ async function exportAccountingReportPdf() {
 
   addPdfFooter(pdf);
   pdf.save("informe-contable-ashford.pdf");
+}
+
+function sanitizeFileNamePart(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase() || "cuenta";
+}
+
+function exportSupplierCurrentAccountExcel(supplierId) {
+  if (!window.XLSX) {
+    console.warn("XLSX no está disponible para exportar la cuenta corriente.");
+    return;
+  }
+  const ledger = getSupplierLedgerData(supplierId);
+  if (!ledger) return;
+  const { supplier, balance, rows, currencyTotals, runningBalance } = ledger;
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{
+    Empresa: COMPANY_EXPORT_INFO.name,
+    Proveedor: supplier.name,
+    CUIT: supplier.cuit,
+    Contacto: supplier.contact || "-",
+    SaldoActual: -balance.saldo,
+  }]), "Proveedor");
+
+  const movementRows = rows.map(({ movement, debe, haber, currency, saldoMoneda }) => ({
+    Fecha: movement.date,
+    Tipo: movement.type,
+    Referencia: movement.reference || "-",
+    Detalle: movement.detail || "-",
+    Monto: Number(movement.amount || 0),
+    Moneda: currency,
+    Debe: debe,
+    Haber: haber,
+    SaldoAcumulado: -saldoMoneda,
+    RealizadoPor: movement.createdBy || "Sistema",
+  }));
+  Object.keys(currencyTotals).sort().forEach((currency) => {
+    movementRows.push({
+      Fecha: "",
+      Tipo: `Subtotal ${currency}`,
+      Referencia: "",
+      Detalle: "",
+      Monto: "",
+      Moneda: currency,
+      Debe: currencyTotals[currency].debe,
+      Haber: currencyTotals[currency].haber,
+      SaldoAcumulado: -runningBalance[currency],
+      RealizadoPor: "",
+    });
+  });
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(movementRows), "Movimientos");
+
+  XLSX.writeFile(workbook, `cuenta-corriente-proveedor-${sanitizeFileNamePart(supplier.name)}.xlsx`);
+}
+
+function exportClientCurrentAccountExcel(clientId) {
+  if (!window.XLSX) {
+    console.warn("XLSX no está disponible para exportar la cuenta corriente.");
+    return;
+  }
+  const ledger = getClientLedgerData(clientId);
+  if (!ledger) return;
+  const { client, balance, rows, currencyTotals, runningBalance } = ledger;
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{
+    Empresa: COMPANY_EXPORT_INFO.name,
+    Cliente: client.name,
+    RutCi: client.rut,
+    Contacto: client.contact || "-",
+    SaldoActual: balance.saldo,
+  }]), "Cliente");
+
+  const movementRows = rows.map(({ movement, debe, haber, currency, saldoMoneda }) => ({
+    Fecha: movement.date,
+    Tipo: movement.type,
+    Referencia: movement.reference || "-",
+    Detalle: movement.detail || "-",
+    Monto: Number(movement.amount || 0),
+    Moneda: currency,
+    Debe: debe,
+    Haber: haber,
+    SaldoAcumulado: saldoMoneda,
+    RealizadoPor: movement.createdBy || "Sistema",
+  }));
+  Object.keys(currencyTotals).sort().forEach((currency) => {
+    movementRows.push({
+      Fecha: "",
+      Tipo: `Subtotal ${currency}`,
+      Referencia: "",
+      Detalle: "",
+      Monto: "",
+      Moneda: currency,
+      Debe: currencyTotals[currency].debe,
+      Haber: currencyTotals[currency].haber,
+      SaldoAcumulado: runningBalance[currency],
+      RealizadoPor: "",
+    });
+  });
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(movementRows), "Movimientos");
+
+  XLSX.writeFile(workbook, `cuenta-corriente-cliente-${sanitizeFileNamePart(client.name)}.xlsx`);
 }
 
 function exportAccountingReportExcel() {
@@ -2123,6 +2416,7 @@ function renderAll() {
   renderSalesTable();
   renderClientTable();
   renderClientAccountTable();
+  renderClientCurrentAccountDetail();
   renderClientCurrentAccounts();
   renderCollectionTable();
   renderClientVoucherDetailsTable();
@@ -2553,6 +2847,16 @@ function attachEvents() {
   const currentAccountSearch = document.getElementById("current-account-search");
   if (currentAccountSearch) currentAccountSearch.addEventListener("input", renderCurrentAccounts);
 
+  const currentAccountClient = document.getElementById("current-account-client");
+  if (currentAccountClient) {
+    currentAccountClient.addEventListener("change", (event) => {
+      selectedCurrentAccountClientId = event.target.value;
+      renderClientCurrentAccountDetail();
+    });
+  }
+  const currentAccountClientSearch = document.getElementById("current-account-client-search");
+  if (currentAccountClientSearch) currentAccountClientSearch.addEventListener("input", renderClientCurrentAccountDetail);
+
   document.querySelectorAll(".nav-btn").forEach((button) => {
     button.addEventListener("click", () => {
       document.querySelectorAll(".nav-btn").forEach((item) => item.classList.remove("active"));
@@ -2797,6 +3101,7 @@ function attachEvents() {
     const supplier = state.suppliers.find((item) => item.name === supplierName);
     const date = document.getElementById("purchase-date").value;
     const concept = document.getElementById("purchase-concept").value.trim();
+    const currency = document.getElementById("purchase-currency")?.value || "UYU";
     const amount = Number(document.getElementById("purchase-amount").value || 0);
     const ivaRate = Number(document.getElementById("purchase-iva-rate").value || 0);
     const iva = amount * ivaRate / 100;
@@ -2810,6 +3115,7 @@ function attachEvents() {
       proveedorId: supplier.id,
       date,
       concept,
+      currency,
       amount,
       iva,
       total,
@@ -2821,7 +3127,7 @@ function attachEvents() {
       type: "Factura",
       date,
       dueDate: addDays(date, 15),
-      currency: "UYU",
+      currency,
       reference: buildReference("F"),
       subtotal: amount,
       ivaRate,
@@ -2845,6 +3151,7 @@ function attachEvents() {
     const supplier = state.suppliers.find((item) => item.name === supplierName);
     const date = document.getElementById("payment-date").value;
     const method = document.getElementById("payment-method").value;
+    const currency = document.getElementById("payment-currency")?.value || "UYU";
     const amount = Number(document.getElementById("payment-amount").value || 0);
 
     if (!supplier || !date || !amount) return;
@@ -2855,6 +3162,7 @@ function attachEvents() {
       proveedorId: supplier.id,
       date,
       method,
+      currency,
       amount,
     };
 
@@ -2864,7 +3172,7 @@ function attachEvents() {
       type: "Pago",
       date,
       dueDate: date,
-      currency: "UYU",
+      currency,
       reference: buildReference("P"),
       subtotal: amount,
       ivaRate: 0,
@@ -2891,6 +3199,23 @@ function attachEvents() {
     const amount2 = Number(document.getElementById("journal-amount-2").value || 0);
 
     if (!date || !detail || !amount1 || !amount2) return;
+
+    if (account1 === account2) {
+      window.alert("Las dos líneas del asiento deben corresponder a cuentas distintas.");
+      return;
+    }
+
+    if (type1 === type2) {
+      window.alert("Un asiento debe tener una línea en el Debe y otra en el Haber (partida doble).");
+      return;
+    }
+
+    const totalDebe = type1 === "Debe" ? amount1 : amount2;
+    const totalHaber = type1 === "Haber" ? amount1 : amount2;
+    if (Math.round(totalDebe * 100) !== Math.round(totalHaber * 100)) {
+      window.alert("El total del Debe debe ser igual al total del Haber para respetar la partida doble.");
+      return;
+    }
 
     state.journalEntries.unshift({
       ...getCreationMetadata(),
@@ -2958,6 +3283,16 @@ function attachEvents() {
   if (modalBackdrop) {
     modalBackdrop.addEventListener("click", closeClientMovementModal);
   }
+
+  document.addEventListener("click", async (event) => {
+    const voucherBtn = event.target.closest("[data-client-voucher-id]");
+    if (!voucherBtn) return;
+    const movementId = voucherBtn.dataset.clientVoucherId;
+    const movement = state.clientMovements.find((m) => m.id === movementId || m.reference === movementId);
+    if (movement) {
+      await generateClientVoucherPdf(movement);
+    }
+  });
 
   const updateClientMovementTotals = () => {
     const subtotal = Number(document.getElementById("client-movement-subtotal")?.value || 0);
@@ -3057,6 +3392,7 @@ function attachEvents() {
     const client = state.clients.find((item) => item.name === clientName);
     const date = document.getElementById("sales-date").value;
     const concept = document.getElementById("sales-concept").value.trim();
+    const currency = document.getElementById("sales-currency")?.value || "UYU";
     const amount = Number(document.getElementById("sales-amount").value || 0);
     const iva = Number(document.getElementById("sales-iva").value || 0);
 
@@ -3069,6 +3405,7 @@ function attachEvents() {
       clientId: client.id,
       date,
       concept,
+      currency,
       amount,
       iva,
       total,
@@ -3080,7 +3417,7 @@ function attachEvents() {
       type: "Factura",
       date,
       dueDate: addDays(date, 15),
-      currency: "UYU",
+      currency,
       reference: buildReference("F"),
       subtotal: amount,
       ivaRate: amount > 0 ? (iva / amount) * 100 : 0,
@@ -3102,6 +3439,7 @@ function attachEvents() {
     const client = state.clients.find((item) => item.name === clientName);
     const date = document.getElementById("collection-date").value;
     const method = document.getElementById("collection-method").value;
+    const currency = document.getElementById("collection-currency")?.value || "UYU";
     const amount = Number(document.getElementById("collection-amount").value || 0);
 
     if (!client || !date || !amount) return;
@@ -3112,6 +3450,7 @@ function attachEvents() {
       clientId: client.id,
       date,
       method,
+      currency,
       amount,
     };
 
@@ -3121,7 +3460,7 @@ function attachEvents() {
       type: "Cobranza",
       date,
       dueDate: date,
-      currency: "UYU",
+      currency,
       reference: buildReference("CB"),
       subtotal: amount,
       ivaRate: 0,

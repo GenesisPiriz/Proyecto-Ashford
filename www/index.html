@@ -13,13 +13,13 @@
     <title>Ashford Contable</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=1.0.27" />
+    <link rel="stylesheet" href="./styles.css?v=1.0.28" />
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
     <script src="./api-config.js"></script>
-    <script defer src="./app.js?v=1.0.27"></script>
+    <script defer src="./app.js?v=1.0.28"></script>
   </head>
   <body>
     <section id="auth-screen" class="auth-screen">
@@ -198,6 +198,14 @@
                     <label>
                       <span>Concepto</span>
                       <input type="text" id="purchase-concept" placeholder="Ej: Mercaderías / Servicios" required />
+                    </label>
+                    <label>
+                      <span>Moneda</span>
+                      <select id="purchase-currency" required>
+                        <option value="UYU">UYU</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                      </select>
                     </label>
                     <label>
                       <span>Importe neto</span>
@@ -472,9 +480,11 @@
                         <th>Tipo</th>
                         <th>Referencia</th>
                         <th>Detalle</th>
+                        <th>Monto</th>
+                        <th>Moneda</th>
                         <th>Debe</th>
                         <th>Haber</th>
-                        <th>Saldo</th>
+                        <th>Saldo acumulado</th>
                         <th>Realizado por</th>
                       </tr>
                     </thead>
@@ -506,6 +516,14 @@
                       <select id="payment-method" required>
                         <option value="Banco">Banco</option>
                         <option value="Efectivo">Efectivo</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Moneda</span>
+                      <select id="payment-currency" required>
+                        <option value="UYU">UYU</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
                       </select>
                     </label>
                     <label>
@@ -1096,6 +1114,14 @@
                       <input type="text" id="sales-concept" placeholder="Ej: Venta de mercaderías / Servicios" required />
                     </label>
                     <label>
+                      <span>Moneda</span>
+                      <select id="sales-currency" required>
+                        <option value="UYU">UYU</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                      </select>
+                    </label>
+                    <label>
                       <span>Importe neto</span>
                       <input type="number" id="sales-amount" min="0" step="0.01" required />
                     </label>
@@ -1415,6 +1441,7 @@
                         <th>Moneda</th>
                         <th>Vencimiento</th>
                         <th>Creado por</th>
+                        <th>Comprobante</th>
                       </tr>
                     </thead>
                     <tbody id="client-voucher-details-body"></tbody>
@@ -1426,9 +1453,43 @@
             <section id="panel-cuenta-clientes" class="panel">
               <div class="panel-header">
                 <h2>Cuenta corriente de clientes</h2>
-                <p>Detalle de saldo a cobrar y pagos recibidos por cliente.</p>
+                <p>Seleccioná un cliente para consultar su cuenta corriente completa, con movimientos por moneda.</p>
               </div>
+              <div class="card provider-account-filter">
+                <label>
+                  <span>Buscar cliente</span>
+                  <input type="search" id="current-account-client-search" placeholder="Escribí el nombre del cliente" autocomplete="off" />
+                </label>
+                <label>
+                  <span>Cliente</span>
+                  <select id="current-account-client" aria-label="Cliente para consultar"></select>
+                </label>
+              </div>
+              <div id="current-account-client-detail" class="provider-account-detail"></div>
               <div class="card list-card wide-card">
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Tipo</th>
+                        <th>Referencia</th>
+                        <th>Detalle</th>
+                        <th>Monto</th>
+                        <th>Moneda</th>
+                        <th>Debe</th>
+                        <th>Haber</th>
+                        <th>Saldo acumulado</th>
+                        <th>Realizado por</th>
+                      </tr>
+                    </thead>
+                    <tbody id="current-account-client-body"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="card list-card wide-card">
+                <h3>Resumen general por cliente</h3>
                 <div class="table-wrap">
                   <table>
                     <thead>
@@ -1445,6 +1506,7 @@
                   </table>
                 </div>
               </div>
+            </section>
             </section>
 
             <section id="panel-cobranzas" class="panel">
@@ -1471,6 +1533,14 @@
                         <option value="Banco">Banco</option>
                         <option value="Cheque">Cheque</option>
                         <option value="Transferencia">Transferencia</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Moneda</span>
+                      <select id="collection-currency" required>
+                        <option value="UYU">UYU</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
                       </select>
                     </label>
                     <label>

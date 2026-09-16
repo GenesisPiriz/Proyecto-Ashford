@@ -690,6 +690,11 @@ h1 {
   border-color: #36a2eb;
 }
 
+.subtotal-row td {
+  background: #eef4fb;
+  border-top: 2px solid var(--border);
+}
+
 #panel-proveedores input,
 #panel-proveedores select,
 #panel-proveedores textarea {
@@ -1287,6 +1292,27 @@ tbody tr:hover {
   border-radius: 8px;
   cursor: pointer;
   font-weight: 700;
+}
+
+.download-voucher-btn {
+  border: 1px solid var(--primary, #36a2eb);
+  background: var(--primary, #36a2eb);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.download-voucher-btn:hover {
+  background: #258cd1;
+  transform: translateY(-1px);
 }
 
 .report-cashflow-card {
