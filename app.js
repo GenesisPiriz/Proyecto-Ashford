@@ -2220,43 +2220,46 @@ function exportSupplierCurrentAccountExcel(supplierId) {
   if (!ledger) return;
   const { supplier, balance, rows, currencyTotals, runningBalance } = ledger;
 
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{
-    Empresa: COMPANY_EXPORT_INFO.name,
-    Proveedor: supplier.name,
-    CUIT: supplier.cuit,
-    Contacto: supplier.contact || "-",
-    SaldoActual: -balance.saldo,
-  }]), "Proveedor");
-
-  const movementRows = rows.map(({ movement, debe, haber, currency, saldoMoneda }) => ({
-    Fecha: movement.date,
-    Tipo: movement.type,
-    Referencia: movement.reference || "-",
-    Detalle: movement.detail || "-",
-    Monto: Number(movement.amount || 0),
-    Moneda: currency,
-    Debe: debe,
-    Haber: haber,
-    SaldoAcumulado: -saldoMoneda,
-    RealizadoPor: movement.createdBy || "Sistema",
-  }));
-  Object.keys(currencyTotals).sort().forEach((currency) => {
-    movementRows.push({
-      Fecha: "",
-      Tipo: `Subtotal ${currency}`,
-      Referencia: "",
-      Detalle: "",
-      Monto: "",
-      Moneda: currency,
-      Debe: currencyTotals[currency].debe,
-      Haber: currencyTotals[currency].haber,
-      SaldoAcumulado: -runningBalance[currency],
-      RealizadoPor: "",
-    });
+  const sheetData = [
+    ["Empresa", COMPANY_EXPORT_INFO.name],
+    ["Proveedor", supplier.name],
+    ["CUIT", supplier.cuit],
+    ["Contacto", supplier.contact || "-"],
+    ["Saldo actual", -balance.saldo],
+    [],
+    ["Fecha", "Tipo", "Referencia", "Detalle", "Monto", "Moneda", "Debe", "Haber", "Saldo acumulado", "Realizado por"],
+  ];
+  rows.forEach(({ movement, debe, haber, currency, saldoMoneda }) => {
+    sheetData.push([
+      movement.date,
+      movement.type,
+      movement.reference || "-",
+      movement.detail || "-",
+      Number(movement.amount || 0),
+      currency,
+      debe,
+      haber,
+      -saldoMoneda,
+      movement.createdBy || "Sistema",
+    ]);
   });
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(movementRows), "Movimientos");
+  Object.keys(currencyTotals).sort().forEach((currency) => {
+    sheetData.push([
+      "",
+      `Subtotal ${currency}`,
+      "",
+      "",
+      "",
+      currency,
+      currencyTotals[currency].debe,
+      currencyTotals[currency].haber,
+      -runningBalance[currency],
+      "",
+    ]);
+  });
 
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(sheetData), "Cuenta corriente");
   XLSX.writeFile(workbook, `cuenta-corriente-proveedor-${sanitizeFileNamePart(supplier.name)}.xlsx`);
 }
 
@@ -2269,43 +2272,46 @@ function exportClientCurrentAccountExcel(clientId) {
   if (!ledger) return;
   const { client, balance, rows, currencyTotals, runningBalance } = ledger;
 
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{
-    Empresa: COMPANY_EXPORT_INFO.name,
-    Cliente: client.name,
-    RutCi: client.rut,
-    Contacto: client.contact || "-",
-    SaldoActual: balance.saldo,
-  }]), "Cliente");
-
-  const movementRows = rows.map(({ movement, debe, haber, currency, saldoMoneda }) => ({
-    Fecha: movement.date,
-    Tipo: movement.type,
-    Referencia: movement.reference || "-",
-    Detalle: movement.detail || "-",
-    Monto: Number(movement.amount || 0),
-    Moneda: currency,
-    Debe: debe,
-    Haber: haber,
-    SaldoAcumulado: saldoMoneda,
-    RealizadoPor: movement.createdBy || "Sistema",
-  }));
-  Object.keys(currencyTotals).sort().forEach((currency) => {
-    movementRows.push({
-      Fecha: "",
-      Tipo: `Subtotal ${currency}`,
-      Referencia: "",
-      Detalle: "",
-      Monto: "",
-      Moneda: currency,
-      Debe: currencyTotals[currency].debe,
-      Haber: currencyTotals[currency].haber,
-      SaldoAcumulado: runningBalance[currency],
-      RealizadoPor: "",
-    });
+  const sheetData = [
+    ["Empresa", COMPANY_EXPORT_INFO.name],
+    ["Cliente", client.name],
+    ["RUT/CI", client.rut],
+    ["Contacto", client.contact || "-"],
+    ["Saldo actual", balance.saldo],
+    [],
+    ["Fecha", "Tipo", "Referencia", "Detalle", "Monto", "Moneda", "Debe", "Haber", "Saldo acumulado", "Realizado por"],
+  ];
+  rows.forEach(({ movement, debe, haber, currency, saldoMoneda }) => {
+    sheetData.push([
+      movement.date,
+      movement.type,
+      movement.reference || "-",
+      movement.detail || "-",
+      Number(movement.amount || 0),
+      currency,
+      debe,
+      haber,
+      saldoMoneda,
+      movement.createdBy || "Sistema",
+    ]);
   });
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(movementRows), "Movimientos");
+  Object.keys(currencyTotals).sort().forEach((currency) => {
+    sheetData.push([
+      "",
+      `Subtotal ${currency}`,
+      "",
+      "",
+      "",
+      currency,
+      currencyTotals[currency].debe,
+      currencyTotals[currency].haber,
+      runningBalance[currency],
+      "",
+    ]);
+  });
 
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(sheetData), "Cuenta corriente");
   XLSX.writeFile(workbook, `cuenta-corriente-cliente-${sanitizeFileNamePart(client.name)}.xlsx`);
 }
 

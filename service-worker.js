@@ -1,5 +1,5 @@
-const CACHE_NAME = "ashford-static-v5";
-const APP_SHELL = ["/", "/index.html", "/styles.css?v=1.0.28", "/app.js?v=1.0.28", "/api-config.js", "/manifest.webmanifest", "/icon.svg"];
+const CACHE_NAME = "ashford-static-v6";
+const APP_SHELL = ["/", "/index.html", "/styles.css?v=1.0.29", "/app.js?v=1.0.29", "/api-config.js", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
